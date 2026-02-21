@@ -15,6 +15,8 @@ interface ToolbarProps {
   onSelectDB: (db: string) => void;
   onSelectTable: (table: string) => void;
   onRefresh: () => void;
+  sqlOpen: boolean;
+  onToggleSql: () => void;
 }
 
 export function Toolbar({
@@ -29,54 +31,61 @@ export function Toolbar({
   onSelectDB,
   onSelectTable,
   onRefresh,
+  sqlOpen,
+  onToggleSql,
 }: ToolbarProps) {
   return (
     <View style={s.toolbar}>
-      <View style={s.brand}>
-        <Text style={s.brandMark}>⬡</Text>
-        <Text style={s.brandName}>SQLite Explorer</Text>
-      </View>
+      <View style={s.topRow}>
+        <View style={s.selectors}>
+          <Dropdown
+            label="Database"
+            value={selectedDB}
+            options={databases}
+            onSelect={onSelectDB}
+            loading={loadingTables && !selectedTable}
+            zIndex={20}
+          />
+          <View style={s.divider} />
+          <Dropdown
+            label="Table"
+            value={selectedTable}
+            options={tables}
+            onSelect={onSelectTable}
+            loading={loadingTables}
+            disabled={!selectedDB}
+            zIndex={10}
+          />
+          <View style={s.divider} />
+          <Pressable
+            style={({ pressed }) => [s.refreshBtn, pressed && s.refreshBtnPressed]}
+            onPress={onRefresh}
+            disabled={!selectedDB}
+          >
+            <Text style={[s.refreshIcon, !selectedDB && s.refreshIconDisabled]}>↻</Text>
+          </Pressable>
+          <View style={s.divider} />
+          <Pressable
+            style={({ pressed }) => [s.sqlBtn, sqlOpen && s.sqlBtnActive, !selectedDB && s.sqlBtnDisabled, pressed && { opacity: 0.8 }]}
+            onPress={onToggleSql}
+            disabled={!selectedDB}
+          >
+            <Text style={[s.sqlBtnText, sqlOpen && s.sqlBtnTextActive]}>›_ SQL</Text>
+          </Pressable>
+        </View>
 
-      <View style={s.selectors}>
-        <Dropdown
-          label="Database"
-          value={selectedDB}
-          options={databases}
-          onSelect={onSelectDB}
-          loading={loadingTables && !selectedTable}
-          zIndex={20}
-        />
-        <View style={s.divider} />
-        <Dropdown
-          label="Table"
-          value={selectedTable}
-          options={tables}
-          onSelect={onSelectTable}
-          loading={loadingTables}
-          disabled={!selectedDB}
-          zIndex={10}
-        />
-        <View style={s.divider} />
-        <Pressable
-          style={({ pressed }) => [s.refreshBtn, pressed && s.refreshBtnPressed]}
-          onPress={onRefresh}
-          disabled={!selectedDB}
-        >
-          <Text style={[s.refreshIcon, !selectedDB && s.refreshIconDisabled]}>↻</Text>
-        </Pressable>
-      </View>
-
-      <View style={s.badges}>
-        {selectedTable && !loadingData && (
-          <View style={s.badge}>
-            <Text style={s.badgeText}>{rowCount} rows</Text>
-          </View>
-        )}
-        {columnCount > 0 && !loadingData && (
-          <View style={[s.badge, s.badgeMuted]}>
-            <Text style={s.badgeText}>{columnCount} cols</Text>
-          </View>
-        )}
+        <View style={s.badges}>
+          {selectedTable && !loadingData && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{rowCount} rows</Text>
+            </View>
+          )}
+          {columnCount > 0 && !loadingData && (
+            <View style={[s.badge, s.badgeMuted]}>
+              <Text style={s.badgeText}>{columnCount} cols</Text>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -84,17 +93,20 @@ export function Toolbar({
 
 const s = StyleSheet.create({
   toolbar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: 'column',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 14,
     backgroundColor: C.surface,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    gap: 20,
     zIndex: 50,
     overflow: 'visible',
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingBottom: 14,
+    gap: 20,
   },
   brand: {
     flexDirection: 'row',
@@ -136,4 +148,21 @@ const s = StyleSheet.create({
   },
   badgeMuted: { backgroundColor: C.surface2 },
   badgeText: { fontSize: 11, fontWeight: '600', color: C.textSecondary },
+  sqlBtn: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 7,
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 1,
+    cursor: 'pointer',
+    marginLeft: 40
+  },
+  sqlBtnActive: { backgroundColor: C.accentSubtle, borderColor: C.accent },
+  sqlBtnDisabled: { opacity: 0.4 },
+  sqlBtnText: { fontSize: 12, fontWeight: '700', color: C.textSecondary, fontFamily: 'monospace' },
+  sqlBtnTextActive: { color: C.accent },
 });

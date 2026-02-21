@@ -17,6 +17,7 @@ export interface ExplorerState {
 }
 
 export type Action =
+  | { type: 'RESET' }
   | { type: 'SELECT_DB'; db: string }
   | { type: 'SELECT_TABLE'; table: string }
   | { type: 'SET_DATABASES'; databases: string[] }
@@ -44,6 +45,9 @@ const initial: ExplorerState = {
 
 function reducer(state: ExplorerState, action: Action): ExplorerState {
   switch (action.type) {
+    case 'RESET':
+      return { ...initial };
+
     case 'SELECT_DB':
       return {
         ...state,
@@ -142,7 +146,7 @@ export function useExplorerState() {
   const [state, dispatch] = useReducer(reducer, initial);
   const { selectedDB, selectedTable } = state;
 
-  const { refresh } = useBridgeSync(dispatch, selectedDB, selectedTable);
+  const { refresh, clearTable, runCustomQuery } = useBridgeSync(dispatch, selectedDB, selectedTable);
 
   const selectDB = useCallback((db: string) => dispatch({ type: 'SELECT_DB', db }), []);
   const selectTable = useCallback((table: string) => dispatch({ type: 'SELECT_TABLE', table }), []);
@@ -151,6 +155,6 @@ export function useExplorerState() {
   const saveRow = useCallback((updated: RowData) => dispatch({ type: 'SAVE_ROW', updated }), []);
   const deleteRow = useCallback(() => dispatch({ type: 'DELETE_ROW' }), []);
 
-  return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh };
+  return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh, clearTable, runCustomQuery };
 }
 

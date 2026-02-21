@@ -19,13 +19,14 @@ export interface DataTableProps {
   onRowSelect: (originalIndex: number) => void;
   status: ExplorerStatus;
   error: string | null;
+  onClearTable?: () => void;
 }
 
 const COL_WIDTH = 160;
 const IDX_WIDTH = 44;
 const HEADER_HEIGHT = 42;
 
-export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status, error }: DataTableProps) {
+export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status, error, onClearTable }: DataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [search, setSearch] = useState<Record<string, string>>({});
@@ -316,6 +317,7 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status
         columnCount={columns.length}
         onPageChange={setPage}
         onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
+        onClearTable={onClearTable}
       />
 
       {filterOpenCol !== null && filterColIdx >= 0 && (
