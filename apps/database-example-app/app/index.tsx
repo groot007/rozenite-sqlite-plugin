@@ -36,25 +36,47 @@ export default function HomeScreen() {
     pluginId: "rozenite-sqlite",
   });
 
+  const [dbMessage, setDbMessage] = useState<string>("");
+
+  const sendDataToPanel = () => {
+      if (!client) return;
+
+      const message = "Hello from the app!" + Math.random();
+    console.log("Clie3ct:", client);
+    client.send("panel-mounted", message);
+  }
+
   useEffect(() => {
     if (!client) return;
 
-    client.onMessage("get-db-list", () => {
-      client.send("send-db-list", ["users.db", "products.db", "notes.db"]);
-    });
+    console.log("Client in panel udseEffect:", client);
+    // client.send("panel-mounted", true);
 
-    client.onMessage("sql-exexute", (sql) => {
-      const db = databases[selectedDB];
-      if (db) {
-        db.getAllAsync(sql)
-          .then((rez) => {
-            client.send("sql-exec-result", rez);
-          })
-          .catch((err) => {
-            client.send("sql-exec-result", { error: err.message });
-          });
-      }
-    });
+    const subscriptions = [
+    client.onMessage("get-db-list", (data) => {
+      setDbMessage("Received get-db-list " + data?.hello);
+      console.log("Received get-db-list message from DevTools, sending database list:", Object.keys(databases));
+      client.send("send-db-list", ["users.db", "products.db", "notes.db"]);
+    }),
+
+    // client.onMessage("sql-exexute", (sql) => {
+    //   const db = databases[selectedDB];
+    //   if (db) {
+    //     db.getAllAsync(sql)
+    //       .then((rez) => {
+    //         client.send("sql-exec-result", rez);
+    //       })
+    //       .catch((err) => {
+    //         client.send("sql-exec-result", { error: err.message });
+    //       });
+    //   }
+    // })
+    ]
+
+
+    return () => {
+      subscriptions.forEach((sub) => sub.remove());
+    }
   }, [client, selectedDB, databases]);
 
   useEffect(() => {
@@ -135,6 +157,7 @@ export default function HomeScreen() {
   };
 
   const openAddModal = () => {
+    client?.send("add-new-row", { db: selectedDB, table: selectedTable });
     setFormData({});
     setEditingId(null);
     setModalVisible(true);
@@ -150,6 +173,12 @@ export default function HomeScreen() {
       {/* Database Selector */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>Select Database</Text>
+        <Button
+        title="Send to panel"
+        onPress={sendDataToPanel}
+        color="#4CAF50"
+      />
+      <Text style={{color:'#000'}}>{dbMessage ?? 'no message'}</Text>
         <View style={styles.buttonGroup}>
           {(["users", "products", "notes"] as const).map((db) => (
             <TouchableOpacity
