@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { C } from '../theme';
 import { Dropdown } from './Dropdown';
 
@@ -14,6 +14,7 @@ interface ToolbarProps {
   columnCount: number;
   onSelectDB: (db: string) => void;
   onSelectTable: (table: string) => void;
+  onRefresh: () => void;
 }
 
 export function Toolbar({
@@ -27,6 +28,7 @@ export function Toolbar({
   columnCount,
   onSelectDB,
   onSelectTable,
+  onRefresh,
 }: ToolbarProps) {
   return (
     <View style={s.toolbar}>
@@ -54,6 +56,14 @@ export function Toolbar({
           disabled={!selectedDB}
           zIndex={10}
         />
+        <View style={s.divider} />
+        <Pressable
+          style={({ pressed }) => [s.refreshBtn, pressed && s.refreshBtnPressed]}
+          onPress={onRefresh}
+          disabled={!selectedDB}
+        >
+          <Text style={[s.refreshIcon, !selectedDB && s.refreshIconDisabled]}>↻</Text>
+        </Pressable>
       </View>
 
       <View style={s.badges}>
@@ -102,6 +112,21 @@ const s = StyleSheet.create({
     overflow: 'visible' as any,
   },
   divider: { width: 12 },
+  refreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 7,
+    backgroundColor: C.surface2,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 1,
+    cursor: 'pointer' as any,
+  },
+  refreshBtnPressed: { backgroundColor: C.accentSubtle, borderColor: C.accent },
+  refreshIcon: { fontSize: 16, color: C.textSecondary, lineHeight: 18 },
+  refreshIconDisabled: { color: C.textMuted, opacity: 0.4 },
   badges: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 3 },
   badge: {
     paddingHorizontal: 10,

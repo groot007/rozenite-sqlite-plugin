@@ -44,7 +44,6 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
 
   return (
     <View style={s.panel}>
-      {/* Header */}
       <View style={s.header}>
         <View>
           <Text style={s.eyebrow}>ROW DETAIL</Text>
@@ -61,7 +60,6 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
         </Pressable>
       </View>
 
-      {/* Fields */}
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
         {Object.entries(draft).map(([key, value]) => (
           <View key={key} style={s.field}>
@@ -79,7 +77,6 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Primary actions: Save + Cancel */}
       <View style={s.primaryActions}>
         <Pressable
           style={({ pressed }) => [s.btn, s.btnSave, !dirty && s.btnSaveDisabled, pressed && !dirty ? {} : pressed && s.btnPressed]}
@@ -95,7 +92,6 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
         </Pressable>
       </View>
 
-      {/* Delete zone */}
       <View style={s.deleteZone}>
         {!confirmDelete ? (
           <Pressable
@@ -135,7 +131,6 @@ const s = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: C.border,
     flexDirection: 'column',
-    // shadow to separate panel from main content
     shadowColor: '#000',
     shadowOffset: { width: -8, height: 0 },
     shadowOpacity: 0.45,
@@ -192,7 +187,6 @@ const s = StyleSheet.create({
     color: C.text,
     outlineStyle: 'none' as any,
   },
-  // Primary actions row (Save + Cancel)
   primaryActions: {
     flexDirection: 'row',
     gap: 8,
@@ -202,7 +196,6 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
-  // Delete zone
   deleteZone: {
     paddingHorizontal: 16,
     paddingBottom: 14,
@@ -222,7 +215,6 @@ const s = StyleSheet.create({
   btnSaveTextDisabled: { color: C.textMuted },
   btnCancel: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   btnCancelText: { fontSize: 13, fontWeight: '500', color: C.textSecondary },
-  // Small delete button at the bottom
   btnDeleteSmall: {
     paddingVertical: 7,
     alignItems: 'center',
@@ -232,7 +224,6 @@ const s = StyleSheet.create({
     borderColor: 'transparent',
   },
   btnDeleteSmallText: { fontSize: 12, color: C.danger, fontWeight: '500' },
-  // Confirm delete
   confirmBox: { gap: 8 },
   confirmLabel: { fontSize: 11, color: C.textMuted, textAlign: 'center' },
   confirmRow: { flexDirection: 'row', gap: 8 },

@@ -12,7 +12,7 @@ import {
   Alert,
 } from "react-native";
 import * as SQLite from "expo-sqlite";
-import { useRozeniteDevToolsClient } from "@rozenite/plugin-bridge";
+import { useRozeniteSQLite } from "rozenite-sqlite/react-native";
 import { DB_CONFIG } from "@/constants/dbConfig";
 import {
   initializeDatabases,
@@ -32,52 +32,17 @@ export default function HomeScreen() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [databases, setDatabases] = useState<Record<string, SQLite.SQLiteDatabase>>({});
 
-  const client = useRozeniteDevToolsClient({
-    pluginId: "rozenite-sqlite",
+  // Connect to the Rozenite SQLite devtools panel.
+  // The hook handles all messaging — databases list + SQL execution.
+  useRozeniteSQLite({
+    databases: Object.keys(databases).map((k) => `${k}.db`),
+    sqlExecutor: async (dbName, query) => {
+      const key = dbName.replace(/\.db$/, "");
+      const db = databases[key];
+      if (!db) throw new Error(`Database "${dbName}" not found`);
+      return db.getAllAsync(query) as Promise<Record<string, unknown>[]>;
+    },
   });
-
-  const [dbMessage, setDbMessage] = useState<string>("");
-
-  const sendDataToPanel = () => {
-      if (!client) return;
-
-      const message = "Hello from the app!" + Math.random();
-    console.log("Clie3ct:", client);
-    client.send("panel-mounted", message);
-  }
-
-  useEffect(() => {
-    if (!client) return;
-
-    console.log("Client in panel udseEffect:", client);
-    // client.send("panel-mounted", true);
-
-    const subscriptions = [
-    client.onMessage("get-db-list", (data) => {
-      setDbMessage("Received get-db-list " + data?.hello);
-      console.log("Received get-db-list message from DevTools, sending database list:", Object.keys(databases));
-      client.send("send-db-list", ["users.db", "products.db", "notes.db"]);
-    }),
-
-    // client.onMessage("sql-exexute", (sql) => {
-    //   const db = databases[selectedDB];
-    //   if (db) {
-    //     db.getAllAsync(sql)
-    //       .then((rez) => {
-    //         client.send("sql-exec-result", rez);
-    //       })
-    //       .catch((err) => {
-    //         client.send("sql-exec-result", { error: err.message });
-    //       });
-    //   }
-    // })
-    ]
-
-
-    return () => {
-      subscriptions.forEach((sub) => sub.remove());
-    }
-  }, [client, selectedDB, databases]);
 
   useEffect(() => {
     const setup = async () => {
@@ -157,7 +122,6 @@ export default function HomeScreen() {
   };
 
   const openAddModal = () => {
-    client?.send("add-new-row", { db: selectedDB, table: selectedTable });
     setFormData({});
     setEditingId(null);
     setModalVisible(true);
@@ -173,12 +137,6 @@ export default function HomeScreen() {
       {/* Database Selector */}
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>Select Database</Text>
-        <Button
-        title="Send to panel"
-        onPress={sendDataToPanel}
-        color="#4CAF50"
-      />
-      <Text style={{color:'#000'}}>{dbMessage ?? 'no message'}</Text>
         <View style={styles.buttonGroup}>
           {(["users", "products", "notes"] as const).map((db) => (
             <TouchableOpacity

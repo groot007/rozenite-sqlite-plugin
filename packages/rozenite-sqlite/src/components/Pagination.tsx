@@ -28,7 +28,6 @@ export default function Pagination({
   const from = totalFiltered === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, totalFiltered);
 
-  // Compute window of page buttons
   const half = Math.floor(MAX_PAGE_BUTTONS / 2);
   let startPage = Math.max(1, page - half);
   let endPage = startPage + MAX_PAGE_BUTTONS - 1;
@@ -43,14 +42,12 @@ export default function Pagination({
 
   return (
     <View style={s.bar}>
-      {/* Info */}
       <Text style={s.info}>
         {totalFiltered === 0
           ? 'No rows'
           : `${from}–${to} of ${totalFiltered}${filterActive ? ` (filtered from ${totalRows})` : ''} rows · ${columnCount} col${columnCount !== 1 ? 's' : ''}`}
       </Text>
 
-      {/* Page controls */}
       <View style={s.controls}>
         <NavBtn label="«" disabled={page <= 1} onPress={() => onPageChange(1)} />
         <NavBtn label="‹" disabled={page <= 1} onPress={() => onPageChange(page - 1)} />
@@ -77,7 +74,6 @@ export default function Pagination({
         <NavBtn label="»" disabled={page >= totalPages} onPress={() => onPageChange(totalPages)} />
       </View>
 
-      {/* Page size */}
       <View style={s.sizeRow}>
         {PAGE_SIZES.map((sz) => (
           <Pressable

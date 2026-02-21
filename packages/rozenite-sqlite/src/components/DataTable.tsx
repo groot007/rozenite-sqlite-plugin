@@ -17,13 +17,14 @@ export interface DataTableProps {
   selectedRowIndex: number | null;
   onRowSelect: (originalIndex: number) => void;
   loading: boolean;
+  connecting?: boolean;
 }
 
 const COL_WIDTH = 160;
 const IDX_WIDTH = 44;
 const HEADER_HEIGHT = 42;
 
-export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loading }: DataTableProps) {
+export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loading, connecting }: DataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [search, setSearch] = useState<Record<string, string>>({});
@@ -32,7 +33,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Inject custom scrollbar CSS for web once
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const id = 'rozenite-scrollbar-styles';
@@ -49,7 +49,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
     document.head.appendChild(el);
   }, []);
 
-  // Reset all state when the table changes
   useEffect(() => {
     setSortCol(null);
     setSortDir('asc');
@@ -59,7 +58,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
     setPage(1);
   }, [columns]);
 
-  // Reset page when filters or sorting change
   useEffect(() => {
     setPage(1);
   }, [search, sortCol, sortDir]);
@@ -116,11 +114,22 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
     [processedRows, page, pageSize],
   );
 
-  // Position of the filter popover relative to the outer container
   const filterColIdx = filterOpenCol !== null ? columns.indexOf(filterOpenCol) : -1;
   const popoverLeft = filterColIdx >= 0
     ? Math.max(0, IDX_WIDTH + filterColIdx * COL_WIDTH - scrollX)
     : 0;
+
+  if (connecting) {
+    return (
+      <View style={s.placeholder}>
+        <Text style={s.placeholderEmoji}>📡</Text>
+        <Text style={s.placeholderTitle}>Waiting for app…</Text>
+        <Text style={s.placeholderSub}>
+          Make sure your app is running and useRozeniteSQLite is initialized
+        </Text>
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -153,7 +162,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
 
   return (
     <View style={s.outer}>
-      {/* ── Sticky header — translates with scrollX to stay in sync ── */}
       <View style={s.headerClip}>
         <View style={[s.headerRow, { transform: [{ translateX: -scrollX }] }]}>
           <View style={[s.cell, { width: IDX_WIDTH }]}>
@@ -165,7 +173,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
             const isFilterOpen = filterOpenCol === col;
             return (
               <View key={col} style={[s.headerCellWrapper, { width: COL_WIDTH }]}>
-                {/* Sort trigger */}
                 <Pressable
                   style={[s.sortBtn, isSortActive && s.sortBtnActive]}
                   onPress={() => handleSortPress(col)}
@@ -180,7 +187,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
                     {isSortActive ? (sortDir === 'asc' ? ' ▴' : ' ▾') : ' ⇅'}
                   </Text>
                 </Pressable>
-                {/* Filter icon */}
                 <Pressable
                   style={[s.filterBtn, (hasFilter || isFilterOpen) && s.filterBtnActive]}
                   onPress={() => handleFilterIconPress(col)}
@@ -195,7 +201,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
         </View>
       </View>
 
-      {/* ── Body: vertical scroll → horizontal scroll → rows ── */}
       <ScrollView
         style={s.vScroll}
         showsVerticalScrollIndicator={true}
@@ -210,14 +215,12 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
           onScrollBeginDrag={() => setFilterOpenCol(null)}
         >
           <View>
-            {/* ── No results ── */}
             {processedRows.length === 0 && hasActiveSearch && (
               <View style={s.noResults}>
                 <Text style={s.noResultsText}>No rows match the current filters</Text>
               </View>
             )}
 
-            {/* ── Data rows ── */}
             {pagedRows.map(({ row, originalIndex }, visIdx) => (
               <Pressable
                 key={originalIndex}
@@ -255,7 +258,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
         </ScrollView>
       </ScrollView>
 
-      {/* ── Pagination footer ── */}
       <Pagination
         page={page}
         pageSize={pageSize}
@@ -266,7 +268,6 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
         onPageSizeChange={(sz) => { setPageSize(sz); setPage(1); }}
       />
 
-      {/* ── Filter popover — rendered outside ScrollView to avoid clipping ── */}
       {filterOpenCol !== null && filterColIdx >= 0 && (
         <View style={[s.filterPopover, { left: popoverLeft }]}>
           <TextInput
@@ -308,7 +309,6 @@ function HighlightText({ text, query }: { text: string; query: string }) {
 
 const s = StyleSheet.create({
   outer: { flex: 1, position: 'relative', flexDirection: 'column' },
-  // Sticky header
   headerClip: {
     overflow: 'hidden',
     height: HEADER_HEIGHT,
@@ -322,7 +322,6 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2,
     height: HEADER_HEIGHT,
   },
-  // Vertically scrollable body
   vScroll: { flex: 1, scrollbarWidth: 'thin' as any, scrollbarColor: '#30363d transparent' as any },
   headerCellWrapper: {
     flexDirection: 'row',
@@ -353,7 +352,6 @@ const s = StyleSheet.create({
   sortArrow: { fontSize: 10, color: C.textMuted },
   sortArrowActive: { color: C.accent },
   cell: { paddingHorizontal: 12, justifyContent: 'center' },
-  // Filter icon button
   filterBtn: {
     width: 26,
     height: 26,
@@ -366,7 +364,6 @@ const s = StyleSheet.create({
   filterBtnActive: { backgroundColor: C.accentSubtle },
   filterBtnText: { fontSize: 14, color: C.textMuted },
   filterBtnTextActive: { color: C.accent },
-  // Filter popover (absolute, outside ScrollView)
   filterPopover: {
     position: 'absolute',
     top: HEADER_HEIGHT + 1,
@@ -402,7 +399,6 @@ const s = StyleSheet.create({
     marginLeft: 6,
   },
   filterClearText: { fontSize: 9, color: C.textSecondary, lineHeight: 9 },
-  // Data rows
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -419,7 +415,6 @@ const s = StyleSheet.create({
   cellNull: { color: C.textMuted, fontStyle: 'italic' },
   cellHighlight: { backgroundColor: '#3d3000', color: '#f5c542', fontWeight: '600' },
   idxText: { fontSize: 11, color: C.textMuted, fontWeight: '600', textAlign: 'center' },
-  // Empty / loading states
   noResults: { paddingVertical: 32, alignItems: 'center' },
   noResultsText: { fontSize: 13, color: C.textMuted, fontStyle: 'italic' },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 60 },

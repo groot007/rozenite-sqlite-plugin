@@ -1,9 +1,6 @@
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
 import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge';
 import type { RowData } from '../theme';
-import { MOCK_DBS, MOCK_TABLES, MOCK_ROWS } from '../mockData';
-
-// ── State shape ───────────────────────────────────────────────────────────────
 
 interface ExplorerState {
   databases: string[];
@@ -16,10 +13,8 @@ interface ExplorerState {
   queryMode: 'tables' | 'data' | null;
   loadingTables: boolean;
   loadingData: boolean;
-  usingMockData: boolean;
+  connecting: boolean;
 }
-
-// ── Actions ───────────────────────────────────────────────────────────────────
 
 type Action =
   | { type: 'SELECT_DB'; db: string }
@@ -34,28 +29,32 @@ type Action =
   | { type: 'SAVE_ROW'; updated: RowData }
   | { type: 'DELETE_ROW' };
 
-// ── Initial state ─────────────────────────────────────────────────────────────
-
 const initial: ExplorerState = {
-  databases: MOCK_DBS,
-  selectedDB: MOCK_DBS[0],
-  tables: MOCK_TABLES[MOCK_DBS[0]],
-  selectedTable: MOCK_TABLES[MOCK_DBS[0]][0],
+  databases: [],
+  selectedDB: null,
+  tables: [],
+  selectedTable: null,
   rows: [],
   columns: [],
   selectedRowIndex: null,
   queryMode: null,
   loadingTables: false,
   loadingData: false,
-  usingMockData: true,
+  connecting: true,
 };
-
-// ── Reducer ───────────────────────────────────────────────────────────────────
 
 function reducer(state: ExplorerState, action: Action): ExplorerState {
   switch (action.type) {
     case 'SELECT_DB':
-      return { ...state, selectedDB: action.db, selectedRowIndex: null };
+      return {
+        ...state,
+        selectedDB: action.db,
+        tables: [],
+        selectedTable: null,
+        rows: [],
+        columns: [],
+        selectedRowIndex: null,
+      };
 
     case 'SELECT_TABLE':
       return { ...state, selectedTable: action.table, selectedRowIndex: null };
@@ -63,7 +62,7 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
     case 'SET_DATABASES':
       return {
         ...state,
-        usingMockData: false,
+        connecting: false,
         databases: action.databases,
         selectedDB: action.databases[0] ?? null,
       };
@@ -81,7 +80,6 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
 
     case 'SET_TABLES': {
       const { tables } = action;
-      // Preserve the current selection if it still exists in the new list
       const selectedTable = tables.includes(state.selectedTable ?? '')
         ? state.selectedTable
         : (tables[0] ?? null);
@@ -136,73 +134,56 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
   }
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
 export function useExplorerState() {
   const [state, dispatch] = useReducer(reducer, initial);
-  const { usingMockData, selectedDB, selectedTable, queryMode } = state;
+  const { selectedDB, selectedTable } = state;
 
   const client = useRozeniteDevToolsClient({ pluginId: 'rozenite-sqlite' });
 
-  // ── Mock: tables ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!usingMockData || !selectedDB) return;
-    dispatch({ type: 'SET_TABLES', tables: MOCK_TABLES[selectedDB] ?? [] });
-  }, [usingMockData, selectedDB]);
+  const pendingRef = useRef<'tables' | 'data' | null>(null);
 
-  // ── Mock: data ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!usingMockData) return;
-    if (selectedDB && selectedTable) {
-      const data = MOCK_ROWS[`${selectedDB}|${selectedTable}`] ?? [];
-      dispatch({
-        type: 'SET_DATA',
-        rows: data,
-        columns: data.length > 0 ? Object.keys(data[0]) : [],
-      });
-    } else {
-      dispatch({ type: 'SET_DATA', rows: [], columns: [] });
-    }
-  }, [usingMockData, selectedDB, selectedTable]);
-
-  // ── Real client: setup + message handlers ─────────────────────────────
   useEffect(() => {
     if (!client) return;
-    client.send('get-db-list', undefined);
+    client.send('get-db-list', true);
 
-    client.onMessage('send-db-list', (dbList: string[]) => {
+    const sub1 = client.onMessage('send-db-list', (dbList: string[]) => {
       dispatch({ type: 'SET_DATABASES', databases: dbList });
     });
 
-    client.onMessage('sql-exec-result', (result: any) => {
-      if (queryMode === 'tables') {
+    const sub2 = client.onMessage('sql-exec-result', (result: any) => {
+      const mode = pendingRef.current;
+      if (mode === 'tables') {
         const tables = Array.isArray(result) ? result.map((r: any) => r.name) : [];
         dispatch({ type: 'SET_TABLES', tables });
-      } else if (queryMode === 'data') {
+      } else if (mode === 'data') {
         const rows: RowData[] = Array.isArray(result) ? result : [];
         dispatch({ type: 'SET_DATA', rows, columns: rows.length > 0 ? Object.keys(rows[0]) : [] });
       }
     });
-  }, [client, queryMode]);
 
-  // ── Real client: fetch tables on DB change ────────────────────────────
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
+  }, [client]);
+
   useEffect(() => {
-    if (!client || usingMockData || !selectedDB) return;
+    if (!client || !selectedDB) return;
+    pendingRef.current = 'tables';
     dispatch({ type: 'LOAD_TABLES_START' });
     client.send('sql-execute', {
       dbName: selectedDB,
       query: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     });
-  }, [client, usingMockData, selectedDB]);
+  }, [client, selectedDB]);
 
-  // ── Real client: fetch data on table change ───────────────────────────
   useEffect(() => {
-    if (!client || usingMockData || !selectedDB || !selectedTable) return;
+    if (!client || !selectedDB || !selectedTable) return;
+    pendingRef.current = 'data';
     dispatch({ type: 'LOAD_DATA_START' });
-    client.send('sql-execute', { dbName: selectedDB, query: `SELECT * FROM ${selectedTable}` });
-  }, [client, usingMockData, selectedDB, selectedTable]);
+    client.send('sql-execute', { dbName: selectedDB, query: `SELECT * FROM "${selectedTable}"` });
+  }, [client, selectedDB, selectedTable]);
 
-  // ── Stable action callbacks ───────────────────────────────────────────
   const selectDB = useCallback((db: string) => dispatch({ type: 'SELECT_DB', db }), []);
   const selectTable = useCallback((table: string) => dispatch({ type: 'SELECT_TABLE', table }), []);
   const selectRow = useCallback((index: number) => dispatch({ type: 'SELECT_ROW', index }), []);
@@ -210,5 +191,22 @@ export function useExplorerState() {
   const saveRow = useCallback((updated: RowData) => dispatch({ type: 'SAVE_ROW', updated }), []);
   const deleteRow = useCallback(() => dispatch({ type: 'DELETE_ROW' }), []);
 
-  return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow };
+  const refresh = useCallback(() => {
+    if (!client) return;
+    if (selectedDB && selectedTable) {
+      pendingRef.current = 'data';
+      dispatch({ type: 'LOAD_DATA_START' });
+      client.send('sql-execute', { dbName: selectedDB, query: `SELECT * FROM "${selectedTable}"` });
+    } else if (selectedDB) {
+      pendingRef.current = 'tables';
+      dispatch({ type: 'LOAD_TABLES_START' });
+      client.send('sql-execute', {
+        dbName: selectedDB,
+        query: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      });
+    }
+  }, [client, selectedDB, selectedTable]);
+
+  return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh };
 }
+

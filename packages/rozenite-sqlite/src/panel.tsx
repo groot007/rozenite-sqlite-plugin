@@ -7,8 +7,8 @@ import { DataTable } from './components/DataTable';
 import { RowDetailPanel } from './components/RowDetailPanel';
 
 export default function SQLiteExplorerPanel() {
-  const { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow } = useExplorerState();
-  const { databases, selectedDB, tables, selectedTable, rows, columns, selectedRowIndex, loadingTables, loadingData } = state;
+  const { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh } = useExplorerState();
+  const { databases, selectedDB, tables, selectedTable, rows, columns, selectedRowIndex, loadingTables, loadingData, connecting } = state;
 
   const selectedRow = selectedRowIndex !== null ? rows[selectedRowIndex] ?? null : null;
 
@@ -25,6 +25,7 @@ export default function SQLiteExplorerPanel() {
         columnCount={columns.length}
         onSelectDB={selectDB}
         onSelectTable={selectTable}
+        onRefresh={refresh}
       />
 
       <View style={s.content}>
@@ -34,6 +35,7 @@ export default function SQLiteExplorerPanel() {
           selectedRowIndex={selectedRowIndex}
           onRowSelect={selectRow}
           loading={loadingData}
+          connecting={connecting}
         />
         {selectedRow !== null && (
           <RowDetailPanel
