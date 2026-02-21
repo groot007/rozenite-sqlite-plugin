@@ -1,8 +1,10 @@
-import { useReducer, useEffect, useCallback, useRef } from 'react';
-import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge';
+import { useReducer, useCallback } from 'react';
 import type { RowData } from '../theme';
+import { useBridgeSync } from './useBridgeSync';
 
-interface ExplorerState {
+export type ExplorerStatus = 'connecting' | 'idle' | 'loadingTables' | 'loadingData' | 'error';
+
+export interface ExplorerState {
   databases: string[];
   selectedDB: string | null;
   tables: string[];
@@ -10,13 +12,11 @@ interface ExplorerState {
   rows: RowData[];
   columns: string[];
   selectedRowIndex: number | null;
-  queryMode: 'tables' | 'data' | null;
-  loadingTables: boolean;
-  loadingData: boolean;
-  connecting: boolean;
+  status: ExplorerStatus;
+  error: string | null;
 }
 
-type Action =
+export type Action =
   | { type: 'SELECT_DB'; db: string }
   | { type: 'SELECT_TABLE'; table: string }
   | { type: 'SET_DATABASES'; databases: string[] }
@@ -24,6 +24,7 @@ type Action =
   | { type: 'SET_TABLES'; tables: string[] }
   | { type: 'LOAD_DATA_START' }
   | { type: 'SET_DATA'; rows: RowData[]; columns: string[] }
+  | { type: 'SET_ERROR'; error: string }
   | { type: 'SELECT_ROW'; index: number }
   | { type: 'CLOSE_ROW' }
   | { type: 'SAVE_ROW'; updated: RowData }
@@ -37,10 +38,8 @@ const initial: ExplorerState = {
   rows: [],
   columns: [],
   selectedRowIndex: null,
-  queryMode: null,
-  loadingTables: false,
-  loadingData: false,
-  connecting: true,
+  status: 'connecting',
+  error: null,
 };
 
 function reducer(state: ExplorerState, action: Action): ExplorerState {
@@ -54,28 +53,30 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
         rows: [],
         columns: [],
         selectedRowIndex: null,
+        error: null,
       };
 
     case 'SELECT_TABLE':
-      return { ...state, selectedTable: action.table, selectedRowIndex: null };
+      return { ...state, selectedTable: action.table, selectedRowIndex: null, error: null };
 
     case 'SET_DATABASES':
       return {
         ...state,
-        connecting: false,
+        status: 'idle',
         databases: action.databases,
         selectedDB: action.databases[0] ?? null,
+        error: null,
       };
 
     case 'LOAD_TABLES_START':
       return {
         ...state,
+        status: 'loadingTables',
         tables: [],
         selectedTable: null,
         rows: [],
         columns: [],
-        loadingTables: true,
-        queryMode: 'tables',
+        error: null,
       };
 
     case 'SET_TABLES': {
@@ -83,27 +84,30 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
       const selectedTable = tables.includes(state.selectedTable ?? '')
         ? state.selectedTable
         : (tables[0] ?? null);
-      return { ...state, tables, selectedTable, loadingTables: false };
+      return { ...state, status: 'idle', tables, selectedTable };
     }
 
     case 'LOAD_DATA_START':
       return {
         ...state,
+        status: 'loadingData',
         rows: [],
         columns: [],
         selectedRowIndex: null,
-        loadingData: true,
-        queryMode: 'data',
+        error: null,
       };
 
     case 'SET_DATA':
       return {
         ...state,
+        status: 'idle',
         rows: action.rows,
         columns: action.columns,
-        loadingData: false,
         selectedRowIndex: null,
       };
+
+    case 'SET_ERROR':
+      return { ...state, status: 'error', error: action.error };
 
     case 'SELECT_ROW':
       return {
@@ -138,51 +142,7 @@ export function useExplorerState() {
   const [state, dispatch] = useReducer(reducer, initial);
   const { selectedDB, selectedTable } = state;
 
-  const client = useRozeniteDevToolsClient({ pluginId: 'rozenite-sqlite' });
-
-  const pendingRef = useRef<'tables' | 'data' | null>(null);
-
-  useEffect(() => {
-    if (!client) return;
-    client.send('get-db-list', true);
-
-    const sub1 = client.onMessage('send-db-list', (dbList: string[]) => {
-      dispatch({ type: 'SET_DATABASES', databases: dbList });
-    });
-
-    const sub2 = client.onMessage('sql-exec-result', (result: any) => {
-      const mode = pendingRef.current;
-      if (mode === 'tables') {
-        const tables = Array.isArray(result) ? result.map((r: any) => r.name) : [];
-        dispatch({ type: 'SET_TABLES', tables });
-      } else if (mode === 'data') {
-        const rows: RowData[] = Array.isArray(result) ? result : [];
-        dispatch({ type: 'SET_DATA', rows, columns: rows.length > 0 ? Object.keys(rows[0]) : [] });
-      }
-    });
-
-    return () => {
-      sub1.remove();
-      sub2.remove();
-    };
-  }, [client]);
-
-  useEffect(() => {
-    if (!client || !selectedDB) return;
-    pendingRef.current = 'tables';
-    dispatch({ type: 'LOAD_TABLES_START' });
-    client.send('sql-execute', {
-      dbName: selectedDB,
-      query: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-    });
-  }, [client, selectedDB]);
-
-  useEffect(() => {
-    if (!client || !selectedDB || !selectedTable) return;
-    pendingRef.current = 'data';
-    dispatch({ type: 'LOAD_DATA_START' });
-    client.send('sql-execute', { dbName: selectedDB, query: `SELECT * FROM "${selectedTable}"` });
-  }, [client, selectedDB, selectedTable]);
+  const { refresh } = useBridgeSync(dispatch, selectedDB, selectedTable);
 
   const selectDB = useCallback((db: string) => dispatch({ type: 'SELECT_DB', db }), []);
   const selectTable = useCallback((table: string) => dispatch({ type: 'SELECT_TABLE', table }), []);
@@ -190,22 +150,6 @@ export function useExplorerState() {
   const closeRow = useCallback(() => dispatch({ type: 'CLOSE_ROW' }), []);
   const saveRow = useCallback((updated: RowData) => dispatch({ type: 'SAVE_ROW', updated }), []);
   const deleteRow = useCallback(() => dispatch({ type: 'DELETE_ROW' }), []);
-
-  const refresh = useCallback(() => {
-    if (!client) return;
-    if (selectedDB && selectedTable) {
-      pendingRef.current = 'data';
-      dispatch({ type: 'LOAD_DATA_START' });
-      client.send('sql-execute', { dbName: selectedDB, query: `SELECT * FROM "${selectedTable}"` });
-    } else if (selectedDB) {
-      pendingRef.current = 'tables';
-      dispatch({ type: 'LOAD_TABLES_START' });
-      client.send('sql-execute', {
-        dbName: selectedDB,
-        query: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-      });
-    }
-  }, [client, selectedDB, selectedTable]);
 
   return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh };
 }

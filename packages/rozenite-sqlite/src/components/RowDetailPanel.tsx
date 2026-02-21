@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { C, type RowData } from '../theme';
 
+function isJsonString(val: string): boolean {
+  const t = val.trim();
+  if (t.length < 2 || (t[0] !== '{' && t[0] !== '[')) return false;
+  try { JSON.parse(t); return true; } catch { return false; }
+}
+
 export interface RowDetailPanelProps {
   row: RowData | null;
   rowIndex: number | null;
@@ -17,7 +23,16 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
 
   useEffect(() => {
     if (row) {
-      setDraft({ ...row });
+      const formatted = Object.fromEntries(
+        Object.entries(row).map(([k, v]) => {
+          const s = v == null ? v : String(v);
+          if (s != null && isJsonString(s)) {
+            try { return [k, JSON.stringify(JSON.parse(s), null, 2)]; } catch {}
+          }
+          return [k, v];
+        })
+      );
+      setDraft(formatted);
       setDirty(false);
       setConfirmDelete(false);
     }
@@ -61,19 +76,26 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
       </View>
 
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        {Object.entries(draft).map(([key, value]) => (
-          <View key={key} style={s.field}>
-            <Text style={s.fieldKey}>{key}</Text>
-            <TextInput
-              style={s.fieldInput}
-              value={value === null || value === undefined ? '' : String(value)}
-              onChangeText={(text) => handleChange(key, text)}
-              placeholder="NULL"
-              placeholderTextColor={C.textMuted}
-              multiline={String(value ?? '').length > 50}
-            />
-          </View>
-        ))}
+        {Object.entries(draft).map(([key, value]) => {
+          const strVal = value === null || value === undefined ? '' : String(value);
+          const isJson = isJsonString(strVal);
+          return (
+            <View key={key} style={s.field}>
+              <View style={s.fieldKeyRow}>
+                <Text style={s.fieldKey}>{key}</Text>
+                {isJson && <Text style={s.fieldJsonBadge}>JSON</Text>}
+              </View>
+              <TextInput
+                style={[s.fieldInput, isJson && s.fieldInputJson]}
+                value={strVal}
+                onChangeText={(text) => handleChange(key, text)}
+                placeholder="NULL"
+                placeholderTextColor={C.textMuted}
+                multiline={isJson || strVal.length > 50}
+              />
+            </View>
+          );
+        })}
         <View style={{ height: 20 }} />
       </ScrollView>
 
@@ -136,7 +158,7 @@ const s = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 20,
     elevation: 10,
-    boxShadow: '-8px 0 24px rgba(0,0,0,0.45)' as any,
+    boxShadow: '-8px 0 24px rgba(0,0,0,0.45)',
   },
   header: {
     flexDirection: 'row',
@@ -168,13 +190,22 @@ const s = StyleSheet.create({
   closeBtnText: { fontSize: 12, color: C.textSecondary },
   scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
   field: { marginBottom: 16 },
+  fieldKeyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 },
   fieldKey: {
     fontSize: 10,
     fontWeight: '700',
     color: C.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.7,
-    marginBottom: 5,
+  },
+  fieldJsonBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#a78bfa',
+    backgroundColor: 'rgba(167,139,250,0.12)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
   fieldInput: {
     backgroundColor: C.surface2,
@@ -186,6 +217,15 @@ const s = StyleSheet.create({
     fontSize: 13,
     color: C.text,
     outlineStyle: 'none' as any,
+  },
+  fieldInputJson: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    borderColor: 'rgba(167,139,250,0.3)',
+    minHeight: 180,
+    textAlignVertical: 'top',
+    paddingTop: 10,
   },
   primaryActions: {
     flexDirection: 'row',

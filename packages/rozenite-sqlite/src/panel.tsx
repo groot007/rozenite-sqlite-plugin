@@ -8,8 +8,10 @@ import { RowDetailPanel } from './components/RowDetailPanel';
 
 export default function SQLiteExplorerPanel() {
   const { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh } = useExplorerState();
-  const { databases, selectedDB, tables, selectedTable, rows, columns, selectedRowIndex, loadingTables, loadingData, connecting } = state;
+  const { databases, selectedDB, tables, selectedTable, rows, columns, selectedRowIndex, status, error } = state;
 
+  const isLoadingTables = status === 'loadingTables';
+  const isLoadingData = status === 'loadingData';
   const selectedRow = selectedRowIndex !== null ? rows[selectedRowIndex] ?? null : null;
 
   return (
@@ -19,8 +21,8 @@ export default function SQLiteExplorerPanel() {
         selectedDB={selectedDB}
         tables={tables}
         selectedTable={selectedTable}
-        loadingTables={loadingTables}
-        loadingData={loadingData}
+        loadingTables={isLoadingTables}
+        loadingData={isLoadingData}
         rowCount={rows.length}
         columnCount={columns.length}
         onSelectDB={selectDB}
@@ -34,8 +36,8 @@ export default function SQLiteExplorerPanel() {
           rows={rows}
           selectedRowIndex={selectedRowIndex}
           onRowSelect={selectRow}
-          loading={loadingData}
-          connecting={connecting}
+          status={status}
+          error={error}
         />
         {selectedRow !== null && (
           <RowDetailPanel

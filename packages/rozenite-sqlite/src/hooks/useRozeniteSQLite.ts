@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge';
+import { EVENTS, PLUGIN_ID } from '../constants';
 
 export type SQLExecutor = (
   dbName: string,
@@ -30,7 +31,7 @@ export interface RozeniteSQLiteConfig {
  * });
  */
 export function useRozeniteSQLite(config: RozeniteSQLiteConfig): void {
-  const client = useRozeniteDevToolsClient({ pluginId: 'rozenite-sqlite' });
+  const client = useRozeniteDevToolsClient({ pluginId: PLUGIN_ID });
 
   const configRef = useRef(config);
   useEffect(() => {
@@ -41,16 +42,19 @@ export function useRozeniteSQLite(config: RozeniteSQLiteConfig): void {
     if (!client) return;
 
     const subs = [
-      client.onMessage('get-db-list', () => {
-        client.send('send-db-list', configRef.current.databases);
+      client.onMessage(EVENTS.GET_DB_LIST, () => {
+        client.send(EVENTS.SEND_DB_LIST, configRef.current.databases);
       }),
 
-      client.onMessage('sql-execute', async (payload: { dbName: string; query: string }) => {
+      client.onMessage(EVENTS.SQL_EXECUTE, async (payload: unknown) => {
+        const { dbName, query } = payload as { dbName: string; query: string };
         try {
-          const rows = await configRef.current.sqlExecutor(payload.dbName, payload.query);
-          client.send('sql-exec-result', rows);
-        } catch (error: any) {
-          client.send('sql-exec-result', { error: error?.message ?? String(error) });
+          const rows = await configRef.current.sqlExecutor(dbName, query);
+          client.send(EVENTS.SQL_EXEC_RESULT, rows);
+        } catch (error: unknown) {
+          client.send(EVENTS.SQL_EXEC_RESULT, {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }),
     ];

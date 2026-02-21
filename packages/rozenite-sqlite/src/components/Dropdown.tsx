@@ -81,7 +81,7 @@ export function Dropdown({
 }
 
 const s = StyleSheet.create({
-  root: { position: 'relative' as any, minWidth: 180 },
+  root: { position: 'relative', minWidth: 180 },
   label: {
     fontSize: 10,
     fontWeight: '600',
@@ -108,7 +108,7 @@ const s = StyleSheet.create({
   triggerPlaceholder: { color: C.textMuted },
   chevron: { fontSize: 11, color: C.textSecondary, marginLeft: 8 },
   menu: {
-    position: 'absolute' as any,
+    position: 'absolute',
     top: 62,
     left: 0,
     right: 0,

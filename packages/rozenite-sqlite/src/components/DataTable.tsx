@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,21 +10,22 @@ import {
 } from 'react-native';
 import { C, type RowData } from '../theme';
 import Pagination from './Pagination';
+import type { ExplorerStatus } from '../hooks/useExplorerState';
 
 export interface DataTableProps {
   columns: string[];
   rows: RowData[];
   selectedRowIndex: number | null;
   onRowSelect: (originalIndex: number) => void;
-  loading: boolean;
-  connecting?: boolean;
+  status: ExplorerStatus;
+  error: string | null;
 }
 
 const COL_WIDTH = 160;
 const IDX_WIDTH = 44;
 const HEADER_HEIGHT = 42;
 
-export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loading, connecting }: DataTableProps) {
+export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status, error }: DataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [search, setSearch] = useState<Record<string, string>>({});
@@ -32,6 +33,11 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
   const [scrollX, setScrollX] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizeRef = useRef<{ col: string; startX: number; startW: number } | null>(null);
+  const colWidthsRef = useRef<Record<string, number>>({});
+  useEffect(() => { colWidthsRef.current = colWidths; }, [colWidths]);
+  const getColWidth = useCallback((col: string) => colWidths[col] ?? COL_WIDTH, [colWidths]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -56,6 +62,7 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
     setFilterOpenCol(null);
     setScrollX(0);
     setPage(1);
+    setColWidths({});
   }, [columns]);
 
   useEffect(() => {
@@ -79,6 +86,29 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
 
   const handleSearchChange = useCallback((col: string, value: string) => {
     setSearch((prev) => ({ ...prev, [col]: value }));
+  }, []);
+
+  const handleResizeStart = useCallback((col: string, e: { clientX: number; preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startW = colWidthsRef.current[col] ?? COL_WIDTH;
+    resizeRef.current = { col, startX: e.clientX, startW };
+    if (typeof document === 'undefined') return;
+    document.body.style.userSelect = 'none';
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const delta = ev.clientX - resizeRef.current.startX;
+      const newW = Math.max(60, resizeRef.current.startW + delta);
+      setColWidths((prev) => ({ ...prev, [resizeRef.current!.col]: newW }));
+    };
+    const onUp = () => {
+      resizeRef.current = null;
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }, []);
 
   const processedRows = useMemo(() => {
@@ -116,10 +146,10 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
 
   const filterColIdx = filterOpenCol !== null ? columns.indexOf(filterOpenCol) : -1;
   const popoverLeft = filterColIdx >= 0
-    ? Math.max(0, IDX_WIDTH + filterColIdx * COL_WIDTH - scrollX)
+    ? Math.max(0, columns.slice(0, filterColIdx).reduce((acc, c) => acc + (colWidths[c] ?? COL_WIDTH), IDX_WIDTH) - scrollX)
     : 0;
 
-  if (connecting) {
+  if (status === 'connecting') {
     return (
       <View style={s.placeholder}>
         <Text style={s.placeholderEmoji}>📡</Text>
@@ -131,11 +161,21 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
     );
   }
 
-  if (loading) {
+  if (status === 'error') {
+    return (
+      <View style={s.placeholder}>
+        <Text style={s.placeholderEmoji}>⚠️</Text>
+        <Text style={s.placeholderTitle}>Query failed</Text>
+        <Text style={s.placeholderSub}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (status === 'loadingTables' || status === 'loadingData') {
     return (
       <View style={s.placeholder}>
         <ActivityIndicator size="large" color={C.accent} />
-        <Text style={s.placeholderText}>Loading rows…</Text>
+        <Text style={s.placeholderText}>Loading…</Text>
       </View>
     );
   }
@@ -172,7 +212,7 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
             const hasFilter = (search[col] ?? '').trim().length > 0;
             const isFilterOpen = filterOpenCol === col;
             return (
-              <View key={col} style={[s.headerCellWrapper, { width: COL_WIDTH }]}>
+              <View key={col} style={[s.headerCellWrapper, { width: getColWidth(col) }]}>
                 <Pressable
                   style={[s.sortBtn, isSortActive && s.sortBtnActive]}
                   onPress={() => handleSortPress(col)}
@@ -195,6 +235,10 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
                     ⌕
                   </Text>
                 </Pressable>
+                <View
+                  style={s.resizeHandle}
+                  onMouseDown={(e: any) => handleResizeStart(col, e)}
+                />
               </View>
             );
           })}
@@ -240,9 +284,15 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
                   const isNull = val == null;
                   const query = (search[col] ?? '').toLowerCase().trim();
                   const display = isNull ? 'NULL' : String(val);
+                  const isJsonVal = !isNull && isJsonString(display);
                   return (
-                    <View key={col} style={[s.cell, { width: COL_WIDTH }]}>
-                      {query && !isNull ? (
+                    <View key={col} style={[s.cell, { width: getColWidth(col) }]}>
+                      {isJsonVal ? (
+                        <View style={s.jsonCell}>
+                          <Text style={s.jsonBadge}>{display.trimStart()[0] === '[' ? '[]' : '{}'}</Text>
+                          <Text style={s.cellText} numberOfLines={1}>{display}</Text>
+                        </View>
+                      ) : query && !isNull ? (
                         <HighlightText text={display} query={query} />
                       ) : (
                         <Text style={[s.cellText, isNull && s.cellNull]} numberOfLines={1}>
@@ -269,7 +319,7 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
       />
 
       {filterOpenCol !== null && filterColIdx >= 0 && (
-        <View style={[s.filterPopover, { left: popoverLeft }]}>
+        <View style={[s.filterPopover, { left: popoverLeft, width: getColWidth(filterOpenCol) }]}>
           <TextInput
             autoFocus
             style={s.filterInput}
@@ -290,6 +340,12 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, loadin
       )}
     </View>
   );
+}
+
+function isJsonString(val: string): boolean {
+  const t = val.trim();
+  if (t.length < 2 || (t[0] !== '{' && t[0] !== '[')) return false;
+  try { JSON.parse(t); return true; } catch { return false; }
 }
 
 function HighlightText({ text, query }: { text: string; query: string }) {
@@ -322,8 +378,9 @@ const s = StyleSheet.create({
     backgroundColor: C.surface2,
     height: HEADER_HEIGHT,
   },
-  vScroll: { flex: 1, scrollbarWidth: 'thin' as any, scrollbarColor: '#30363d transparent' as any },
+  vScroll: { flex: 1, scrollbarWidth: 'thin', scrollbarColor: '#30363d transparent' },
   headerCellWrapper: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     height: HEADER_HEIGHT,
@@ -337,7 +394,7 @@ const s = StyleSheet.create({
     paddingLeft: 12,
     paddingRight: 4,
     height: HEADER_HEIGHT,
-    cursor: 'pointer' as any,
+    cursor: 'pointer',
   },
   sortBtnActive: {},
   headerText: {
@@ -349,7 +406,7 @@ const s = StyleSheet.create({
     flex: 1,
   },
   headerTextActive: { color: C.accent },
-  sortArrow: { fontSize: 10, color: C.textMuted },
+  sortArrow: { fontSize: 14, color: C.textMuted },
   sortArrowActive: { color: C.accent },
   cell: { paddingHorizontal: 12, justifyContent: 'center' },
   filterBtn: {
@@ -359,10 +416,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
-    cursor: 'pointer' as any,
+    cursor: 'pointer',
   },
   filterBtnActive: { backgroundColor: C.accentSubtle },
-  filterBtnText: { fontSize: 14, color: C.textMuted },
+  filterBtnText: { fontSize: 24, color: C.textMuted },
   filterBtnTextActive: { color: C.accent },
   filterPopover: {
     position: 'absolute',
@@ -405,7 +462,7 @@ const s = StyleSheet.create({
     paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: C.borderSubtle,
-    cursor: 'pointer' as any,
+    cursor: 'pointer',
   },
   rowEven: { backgroundColor: C.bg },
   rowOdd: { backgroundColor: C.surface },
@@ -422,4 +479,24 @@ const s = StyleSheet.create({
   placeholderTitle: { fontSize: 15, fontWeight: '600', color: C.textSecondary, marginBottom: 6 },
   placeholderSub: { fontSize: 13, color: C.textMuted },
   placeholderText: { fontSize: 14, color: C.textSecondary, marginTop: 14 },
+  resizeHandle: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 6,
+    height: HEADER_HEIGHT,
+    cursor: 'col-resize' as any,
+    zIndex: 10,
+  },
+  jsonCell: { flexDirection: 'row', alignItems: 'center', gap: 5, overflow: 'hidden' },
+  jsonBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#a78bfa',
+    backgroundColor: 'rgba(167,139,250,0.12)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 3,
+    flexShrink: 0,
+  },
 });

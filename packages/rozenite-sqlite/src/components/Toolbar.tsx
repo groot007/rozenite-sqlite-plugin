@@ -94,7 +94,7 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
     gap: 20,
     zIndex: 50,
-    overflow: 'visible' as any,
+    overflow: 'visible',
   },
   brand: {
     flexDirection: 'row',
@@ -109,7 +109,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     flex: 1,
-    overflow: 'visible' as any,
+    overflow: 'visible',
   },
   divider: { width: 12 },
   refreshBtn: {
@@ -122,7 +122,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 1,
-    cursor: 'pointer' as any,
+    cursor: 'pointer',
   },
   refreshBtnPressed: { backgroundColor: C.accentSubtle, borderColor: C.accent },
   refreshIcon: { fontSize: 16, color: C.textSecondary, lineHeight: 18 },

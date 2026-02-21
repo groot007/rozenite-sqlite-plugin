@@ -98,4 +98,41 @@ export const DB_CONFIG = {
       },
     },
   },
+  analytics: {
+    tables: {
+      events: {
+        name: "events",
+        columns: ["id", "event_name", "user_id", "metadata", "created_at"],
+        createSQL: `CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_name TEXT NOT NULL,
+          user_id INTEGER,
+          metadata TEXT,
+          created_at TEXT
+        );`,
+      },
+      ab_tests: {
+        name: "ab_tests",
+        columns: ["id", "test_name", "variant", "config", "started_at"],
+        createSQL: `CREATE TABLE IF NOT EXISTS ab_tests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          test_name TEXT NOT NULL,
+          variant TEXT,
+          config TEXT,
+          started_at TEXT
+        );`,
+      },
+      feature_flags: {
+        name: "feature_flags",
+        columns: ["id", "flag_name", "enabled", "rules", "updated_at"],
+        createSQL: `CREATE TABLE IF NOT EXISTS feature_flags (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          flag_name TEXT NOT NULL,
+          enabled INTEGER DEFAULT 0,
+          rules TEXT,
+          updated_at TEXT
+        );`,
+      },
+    },
+  },
 };

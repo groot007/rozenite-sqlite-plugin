@@ -9,9 +9,9 @@ export const C = {
   text: '#e6edf3',
   textSecondary: '#8b949e',
   textMuted: '#484f58',
-  accent: '#388bfd',
-  accentSubtle: '#1c2d4a',
+  accent: '#2dd4a0',
+  accentSubtle: '#0d2e26',
   danger: '#f85149',
   success: '#3fb950',
-  rowSelected: '#172033',
+  rowSelected: '#0d2620',
 } as const;

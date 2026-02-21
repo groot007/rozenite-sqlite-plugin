@@ -22,7 +22,7 @@ import {
 } from "@/utils/database";
 
 export default function HomeScreen() {
-  const [selectedDB, setSelectedDB] = useState<"users" | "products" | "notes">(
+  const [selectedDB, setSelectedDB] = useState<"users" | "products" | "notes" | "analytics">(
     "users"
   );
   const [selectedTable, setSelectedTable] = useState<string>("users");
@@ -62,10 +62,8 @@ export default function HomeScreen() {
     load();
   }, [selectedDB, selectedTable, databases]);
 
-  const getTableConfig = () => {
-    return DB_CONFIG[selectedDB as keyof typeof DB_CONFIG].tables[
-      selectedTable as any
-    ];
+  const getTableConfig = (): { name: string; columns: string[]; createSQL: string } => {
+    return (DB_CONFIG[selectedDB as keyof typeof DB_CONFIG].tables as any)[selectedTable];
   };
 
   const handleAddEdit = async () => {
@@ -138,7 +136,7 @@ export default function HomeScreen() {
       <View style={styles.sectionContainer}>
         <Text style={styles.sectionTitle}>Select Database</Text>
         <View style={styles.buttonGroup}>
-          {(["users", "products", "notes"] as const).map((db) => (
+          {(["users", "products", "notes", "analytics"] as const).map((db) => (
             <TouchableOpacity
               key={db}
               style={[
