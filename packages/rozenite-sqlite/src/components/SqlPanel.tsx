@@ -22,18 +22,25 @@ export function SqlPanel({ selectedDB, runCustomQuery }: SqlPanelProps) {
   const [queryResult, setQueryResult] = useState<{ rows: RowData[]; columns: string[] } | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
 
-  const handleRun = async () => {
+  const handleRun = () => {
     if (!sql.trim() || queryRunning || !selectedDB) return;
     setQueryRunning(true);
     setQueryResult(null);
     setQueryError(null);
-    const result = await runCustomQuery(sql.trim());
-    setQueryRunning(false);
-    if (result.error) {
-      setQueryError(result.error);
-    } else {
-      setQueryResult({ rows: result.rows, columns: result.columns });
-    }
+    runCustomQuery(sql.trim()).then(
+      (result) => {
+        setQueryRunning(false);
+        if (result.error) {
+          setQueryError(result.error);
+        } else {
+          setQueryResult({ rows: result.rows, columns: result.columns });
+        }
+      },
+      (err: unknown) => {
+        setQueryRunning(false);
+        setQueryError(err instanceof Error ? err.message : String(err));
+      },
+    );
   };
 
   return (

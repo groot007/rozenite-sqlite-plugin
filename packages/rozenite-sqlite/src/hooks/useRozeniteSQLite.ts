@@ -46,16 +46,18 @@ export function useRozeniteSQLite(config: RozeniteSQLiteConfig): void {
         client.send(EVENTS.SEND_DB_LIST, configRef.current.databases);
       }),
 
-      client.onMessage(EVENTS.SQL_EXECUTE, async (payload: unknown) => {
+      client.onMessage(EVENTS.SQL_EXECUTE, (payload: unknown) => {
         const { dbName, query } = payload as { dbName: string; query: string };
-        try {
-          const rows = await configRef.current.sqlExecutor(dbName, query);
-          client.send(EVENTS.SQL_EXEC_RESULT, rows);
-        } catch (error: unknown) {
-          client.send(EVENTS.SQL_EXEC_RESULT, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        configRef.current.sqlExecutor(dbName, query).then(
+          (rows) => {
+            client.send(EVENTS.SQL_EXEC_RESULT, rows);
+          },
+          (error: unknown) => {
+            client.send(EVENTS.SQL_EXEC_RESULT, {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          },
+        );
       }),
     ];
 

@@ -1,4 +1,4 @@
-import { useRef as _, useEffect as E } from "react";
+import { useRef as i, useEffect as r } from "react";
 import { useRozeniteDevToolsClient as u } from "@rozenite/plugin-bridge";
 const L = "rozenite-sqlite", t = {
   GET_DB_LIST: "get-db-list",
@@ -6,33 +6,35 @@ const L = "rozenite-sqlite", t = {
   SQL_EXECUTE: "sql-execute",
   SQL_EXEC_RESULT: "sql-exec-result"
 };
-function l(o) {
-  const e = u({ pluginId: L }), r = _(o);
-  E(() => {
-    r.current = o;
-  }), E(() => {
+function f(o) {
+  const e = u({ pluginId: L }), n = i(o);
+  r(() => {
+    n.current = o;
+  }), r(() => {
     if (!e) return;
     const c = [
       e.onMessage(t.GET_DB_LIST, () => {
-        e.send(t.SEND_DB_LIST, r.current.databases);
+        e.send(t.SEND_DB_LIST, n.current.databases);
       }),
-      e.onMessage(t.SQL_EXECUTE, async (n) => {
-        const { dbName: i, query: S } = n;
-        try {
-          const s = await r.current.sqlExecutor(i, S);
-          e.send(t.SQL_EXEC_RESULT, s);
-        } catch (s) {
-          e.send(t.SQL_EXEC_RESULT, {
-            error: s instanceof Error ? s.message : String(s)
-          });
-        }
+      e.onMessage(t.SQL_EXECUTE, (E) => {
+        const { dbName: S, query: _ } = E;
+        n.current.sqlExecutor(S, _).then(
+          (s) => {
+            e.send(t.SQL_EXEC_RESULT, s);
+          },
+          (s) => {
+            e.send(t.SQL_EXEC_RESULT, {
+              error: s instanceof Error ? s.message : String(s)
+            });
+          }
+        );
       })
     ];
     return () => {
-      c.forEach((n) => n.remove());
+      c.forEach((E) => E.remove());
     };
   }, [e]);
 }
 export {
-  l as useRozeniteSQLite
+  f as useRozeniteSQLite
 };

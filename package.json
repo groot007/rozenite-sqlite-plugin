@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "run:app": "npm run start --workspace=apps/database-example-app",
-    "run:plugin:dev": "npm run dev --workspace=packages/rozenite-sqlite"
+    "app": "npm run start --workspace=apps/database-example-app",
+    "plugin": "npm run dev --workspace=packages/rozenite-sqlite"
   }
 }

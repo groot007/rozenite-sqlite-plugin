@@ -1,1 +1,1 @@
-{"name":"rozenite-sqlite","version":"0.0.1","description":"SQLite explorer for RN devtools","panels":[{"name":"Hello world!","source":"/hello-world.html"}]}
+{"name":"rozenite-sqlite","version":"0.0.1","description":"SQLite explorer for RN devtools","panels":[{"name":"SQLite","source":"/panel.html"}]}
