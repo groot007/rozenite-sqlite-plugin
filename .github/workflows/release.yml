@@ -1,0 +1,49 @@
+name: Release & Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write  # needed to create GitHub releases
+  id-token: write  # required for OIDC trusted publishing
+
+jobs:
+  release:
+    name: Build, Release & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        working-directory: packages/rozenite-sqlite
+        run: npm run build
+
+      - name: Derive version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+
+      - name: Publish to npm
+        working-directory: packages/rozenite-sqlite
+        run: npm publish --access public
+        # No NODE_AUTH_TOKEN needed — OIDC trusted publishing handles authentication
