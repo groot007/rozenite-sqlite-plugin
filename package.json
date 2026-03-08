@@ -9,7 +9,7 @@
   "scripts": {
     "app": "npm run start --workspace=apps/database-example-app",
     "plugin": "npm run dev --workspace=packages/rozenite-sqlite",
-    "release": "changeset version && git add -A && git commit -m \"chore: release\" && git tag -a \"rozenite-sqlite@$(node -p \"require('./packages/rozenite-sqlite/package.json').version\")\" -m \"release\" && git push && git push --tags"
+    "release": "changeset version && git add -A && git commit -m \"chore: release\" && git tag -a \"v$(node -p \"require('./packages/rozenite-sqlite/package.json').version\")\" -m \"release\" && git push && git push --tags"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0"
