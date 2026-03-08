@@ -1,5 +1,11 @@
 # rozenite-sqlite
 
+## 0.0.6
+
+### Patch Changes
+
+- test workflow
+
 ## 0.0.5
 
 ### Patch Changes
