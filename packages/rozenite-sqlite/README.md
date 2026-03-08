@@ -19,6 +19,8 @@ Make sure you also have the Rozenite devtools set up in your project. Refer to t
 
 Call `useRozeniteSQLite` once near the root of your app (or in the component that holds your database instances). The hook handles all communication with the devtools panel — you don't interact with the plugin bridge directly.
 
+The `sqlExecutor` callback is fully library-agnostic — you provide the bridge between the plugin and whichever SQLite library you use. It receives the database name and a raw SQL string, and must return a `Promise<Record<string, unknown>[]>` (an array of row objects).
+
 ```tsx
 import { useRozeniteSQLite } from 'rozenite-sqlite/react-native';
 
@@ -26,6 +28,7 @@ export default function App() {
   useRozeniteSQLite({
     databases: ['app.db', 'cache.db'],
     sqlExecutor: async (dbName, query) => {
+      // Use any SQLite library here — see examples below
       const db = myDatabases[dbName];
       return db.getAllAsync(query);
     },
@@ -35,7 +38,28 @@ export default function App() {
 }
 ```
 
-### With expo-sqlite
+### With expo-sqlite (`openDatabaseSync`)
+
+```tsx
+import * as SQLite from 'expo-sqlite';
+import { useRozeniteSQLite } from 'rozenite-sqlite/react-native';
+
+export default function App() {
+  useRozeniteSQLite({
+    databases: ['app.db', 'cache.db'],
+    sqlExecutor: async (dbName, query) => {
+      const db = SQLite.openDatabaseSync(dbName);
+      return db.getAllSync(query) as Record<string, unknown>[];
+    },
+  });
+
+  // ...
+}
+```
+
+> `openDatabaseSync` returns the existing open connection if the database is already open, so it's safe to call on every query without storing the instance.
+
+### With expo-sqlite (`openDatabaseAsync`)
 
 ```tsx
 import { useEffect, useState } from 'react';
@@ -61,6 +85,25 @@ export default function App() {
       const db = databases[key];
       if (!db) throw new Error(`Database "${dbName}" not found`);
       return db.getAllAsync(query) as Promise<Record<string, unknown>[]>;
+    },
+  });
+
+  // ...
+}
+```
+
+### With a custom native module
+
+```tsx
+import { useRozeniteSQLite } from 'rozenite-sqlite/react-native';
+import SqliteServiceModule from './SqliteServiceModule';
+
+export default function App() {
+  useRozeniteSQLite({
+    databases: ['app.db'],
+    sqlExecutor: async (dbName, query) => {
+      const result = await SqliteServiceModule.execute(dbName, query, true);
+      return JSON.parse(result) as Record<string, unknown>[];
     },
   });
 
