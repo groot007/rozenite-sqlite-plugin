@@ -1,2 +1,3 @@
 *
-!packages/rozenite-sqlite
+!packages/rozenite-sqlite/**
+packages/rozenite-sqlite/node_modules
