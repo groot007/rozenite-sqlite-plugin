@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRozeniteDevToolsClient } from '@rozenite/plugin-bridge';
 import { EVENTS, PLUGIN_ID } from '../constants';
+import { escapeValue } from '../utils/escapeValue';
 
 export type SQLExecutor = (
   dbName: string,
@@ -12,16 +13,6 @@ export interface RozeniteSQLiteConfig {
   databases: string[];
   /** Library-agnostic SQL runner — receives the db name and raw query, returns rows */
   sqlExecutor: SQLExecutor;
-}
-
-/** Escape a value for safe SQL string interpolation */
-function escapeValue(val: unknown): string {
-  if (val === null || val === undefined) return 'NULL';
-  if (typeof val === 'number') return String(val);
-  if (typeof val === 'boolean') return val ? '1' : '0';
-  // Escape single quotes by doubling them
-  const str = String(val).replace(/'/g, "''");
-  return `'${str}'`;
 }
 
 /**

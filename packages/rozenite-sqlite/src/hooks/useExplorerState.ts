@@ -43,7 +43,10 @@ const initial: ExplorerState = {
   error: null,
 };
 
-function reducer(state: ExplorerState, action: Action): ExplorerState {
+// Export for testing
+export const initialState = initial;
+
+export function reducer(state: ExplorerState, action: Action): ExplorerState {
   switch (action.type) {
     case 'RESET':
       return { ...initial };
