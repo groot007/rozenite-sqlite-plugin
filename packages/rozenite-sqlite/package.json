@@ -1,6 +1,6 @@
 {
   "name": "rozenite-sqlite",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "SQLite explorer for RN devtools",
   "type": "module",
   "main": "./dist/react-native.js",
