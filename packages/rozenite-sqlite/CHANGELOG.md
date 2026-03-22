@@ -1,5 +1,11 @@
 # rozenite-sqlite
 
+## 0.0.10
+
+### Patch Changes
+
+- remove npm ignore lool sorry
+
 ## 0.0.9
 
 ### Patch Changes
