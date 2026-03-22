@@ -14,16 +14,22 @@ function fetchData(client: NonNullable<BridgeClient>, dbName: string, tableName:
   client.send(EVENTS.SQL_EXECUTE, { dbName, query: `SELECT * FROM "${tableName}"` });
 }
 
+export interface MutationResult {
+  success: boolean;
+  error?: string;
+}
+
 export function useBridgeSync(
   dispatch: React.Dispatch<Action>,
   selectedDB: string | null,
   selectedTable: string | null,
 ) {
   const client = useRozeniteDevToolsClient({ pluginId: PLUGIN_ID });
-  const pendingRef = useRef<'tables' | 'data' | 'clear' | 'query' | null>(null);
+  const pendingRef = useRef<'tables' | 'data' | 'query' | null>(null);
   const selectedDBRef = useRef(selectedDB);
   const selectedTableRef = useRef(selectedTable);
   const customQueryResolverRef = useRef<((r: { rows: RowData[]; columns: string[]; error?: string }) => void) | null>(null);
+  const mutationResolverRef = useRef<((r: MutationResult) => void) | null>(null);
   useEffect(() => { selectedDBRef.current = selectedDB; }, [selectedDB]);
   useEffect(() => { selectedTableRef.current = selectedTable; }, [selectedTable]);
 
@@ -72,20 +78,20 @@ export function useBridgeSync(
       } else if (mode === 'data') {
         const rows: RowData[] = Array.isArray(payload) ? (payload as RowData[]) : [];
         dispatch({ type: 'SET_DATA', rows, columns: rows.length > 0 ? Object.keys(rows[0]) : [] });
-      } else if (mode === 'clear') {
-        const db = selectedDBRef.current;
-        const table = selectedTableRef.current;
-        if (db && table) {
-          pendingRef.current = 'data';
-          dispatch({ type: 'LOAD_DATA_START' });
-          fetchData(client, db, table);
-        }
       }
+    });
+
+    const sub3 = client.onMessage(EVENTS.MUTATION_RESULT, (payload: unknown) => {
+      const resolver = mutationResolverRef.current;
+      mutationResolverRef.current = null;
+      const result = payload as MutationResult;
+      resolver?.(result);
     });
 
     return () => {
       sub1.remove();
       sub2.remove();
+      sub3.remove();
     };
   }, [client, dispatch]);
 
@@ -120,12 +126,28 @@ export function useBridgeSync(
     }
   }, [client, selectedDB, selectedTable, dispatch]);
 
-  const clearTable = useCallback(() => {
-    if (!client || !selectedDB || !selectedTable) return;
-    pendingRef.current = 'clear';
-    dispatch({ type: 'LOAD_DATA_START' });
-    client.send(EVENTS.SQL_EXECUTE, { dbName: selectedDB, query: `DELETE FROM "${selectedTable}"` });
-  }, [client, selectedDB, selectedTable, dispatch]);
+  const clearTable = useCallback(
+    (): Promise<MutationResult> =>
+      new Promise((resolve) => {
+        const db = selectedDBRef.current;
+        const table = selectedTableRef.current;
+        if (!client || !db || !table) {
+          resolve({ success: false, error: 'No database or table selected' });
+          return;
+        }
+        mutationResolverRef.current = (result) => {
+          resolve(result);
+          // Refresh data after successful clear
+          if (result.success && client) {
+            pendingRef.current = 'data';
+            dispatch({ type: 'LOAD_DATA_START' });
+            fetchData(client, db, table);
+          }
+        };
+        client.send(EVENTS.CLEAR_TABLE, { dbName: db, table });
+      }),
+    [client, dispatch],
+  );
 
   const runCustomQuery = useCallback(
     (sql: string): Promise<{ rows: RowData[]; columns: string[]; error?: string }> =>
@@ -142,5 +164,54 @@ export function useBridgeSync(
     [client],
   );
 
-  return { refresh, clearTable, runCustomQuery };
+  const saveRowToDB = useCallback(
+    (row: RowData, columns: string[]): Promise<MutationResult> =>
+      new Promise((resolve) => {
+        const db = selectedDBRef.current;
+        const table = selectedTableRef.current;
+        if (!client || !db || !table) {
+          resolve({ success: false, error: 'No database or table selected' });
+          return;
+        }
+        // Detect primary key: use 'id' if it exists, otherwise use first column
+        const primaryKey = columns.includes('id') ? 'id' : columns[0];
+        if (!primaryKey) {
+          resolve({ success: false, error: 'Cannot determine primary key' });
+          return;
+        }
+        mutationResolverRef.current = resolve;
+        client.send(EVENTS.SAVE_ROW, { dbName: db, table, row, primaryKey });
+      }),
+    [client],
+  );
+
+  const deleteRowFromDB = useCallback(
+    (row: RowData, columns: string[]): Promise<MutationResult> =>
+      new Promise((resolve) => {
+        const db = selectedDBRef.current;
+        const table = selectedTableRef.current;
+        if (!client || !db || !table) {
+          resolve({ success: false, error: 'No database or table selected' });
+          return;
+        }
+        // Detect primary key: use 'id' if it exists, otherwise use first column
+        const primaryKey = columns.includes('id') ? 'id' : columns[0];
+        if (!primaryKey) {
+          resolve({ success: false, error: 'Cannot determine primary key' });
+          return;
+        }
+        const primaryKeyValue = row[primaryKey];
+        mutationResolverRef.current = resolve;
+        client.send(EVENTS.DELETE_ROW, { dbName: db, table, primaryKey, primaryKeyValue });
+      }),
+    [client],
+  );
+
+  const reconnect = useCallback(() => {
+    if (!client) return;
+    dispatch({ type: 'RESET' });
+    client.send(EVENTS.GET_DB_LIST, true);
+  }, [client, dispatch]);
+
+  return { refresh, clearTable, runCustomQuery, saveRowToDB, deleteRowFromDB, reconnect };
 }

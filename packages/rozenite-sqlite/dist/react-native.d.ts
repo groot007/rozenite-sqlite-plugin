@@ -8,7 +8,7 @@ export declare interface RozeniteSQLiteConfig {
 export declare type SQLExecutor = (dbName: string, query: string) => Promise<Record<string, unknown>[]>;
 
 /**
- * Connects your React Native app to the Rozenite SQLite devtools panel.
+ * Connects your React Native app to the SQLighter devtools panel.
  *
  * Call this once somewhere near the root of your app (or in the component
  * that holds the database instances). It handles all devtools communication —

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  Button,
   FlatList,
   StyleSheet,
   ScrollView,
@@ -32,7 +31,7 @@ export default function HomeScreen() {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [databases, setDatabases] = useState<Record<string, SQLite.SQLiteDatabase>>({});
 
-  // Connect to the Rozenite SQLite devtools panel.
+  // Connect to the SQLighter devtools panel.
   // The hook handles all messaging — databases list + SQL execution.
   useRozeniteSQLite({
     databases: Object.keys(databases).map((k) => `${k}.db`),
@@ -187,12 +186,23 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Add Button */}
-      <Button
-        title="+ Add New Row"
-        onPress={openAddModal}
-        color="#4CAF50"
-      />
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+          <Text style={styles.addButtonText}>+ Add New Row</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={async () => {
+            const db = databases[selectedDB];
+            if (!db) return;
+            const data = await loadTableData(db, selectedTable);
+            setRows(data);
+          }}
+        >
+          <Text style={styles.refreshButtonText}>↻ Refresh</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Data List */}
       <ScrollView style={{ marginTop: 16 }}>
@@ -255,12 +265,20 @@ export default function HomeScreen() {
             ))}
 
             <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={() => setModalVisible(false)} />
-              <Button
-                title={editingId ? "Update" : "Add"}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.submitButton}
                 onPress={handleAddEdit}
-                color="#4CAF50"
-              />
+              >
+                <Text style={styles.submitButtonText}>
+                  {editingId ? "Update" : "Add"}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -334,6 +352,34 @@ const styles = StyleSheet.create({
   },
   tableButtonTextActive: {
     color: "#fff",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  addButton: {
+    flex: 1,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  addButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
+  refreshButton: {
+    backgroundColor: "#2196F3",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  refreshButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
   },
   rowContainer: {
     flexDirection: "row",
@@ -421,5 +467,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginTop: 16,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#9e9e9e",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
+  submitButton: {
+    flex: 1,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
   },
 });

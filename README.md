@@ -1,4 +1,4 @@
-# rozenite-sqlite
+# SQLighter
 
 A [Rozenite](https://www.rozenite.dev) devtools plugin for inspecting and editing SQLite databases in React Native apps — directly from your browser devtools panel.
 
@@ -73,7 +73,7 @@ This makes the plugin database-library-agnostic — wire it to `expo-sqlite`, `o
 
 ### 3. Open Rozenite devtools
 
-With the app running, open the Rozenite devtools panel in your browser. The **SQLite Explorer** plugin will appear automatically.
+With the app running, open the Rozenite devtools panel in your browser. The **SQLighter** plugin will appear automatically.
 
 ---
 

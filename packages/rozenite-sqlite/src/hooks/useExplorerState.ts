@@ -1,6 +1,6 @@
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useState } from 'react';
 import type { RowData } from '../theme';
-import { useBridgeSync } from './useBridgeSync';
+import { useBridgeSync, type MutationResult } from './useBridgeSync';
 
 export type ExplorerStatus = 'connecting' | 'idle' | 'loadingTables' | 'loadingData' | 'error';
 
@@ -144,17 +144,73 @@ function reducer(state: ExplorerState, action: Action): ExplorerState {
 
 export function useExplorerState() {
   const [state, dispatch] = useReducer(reducer, initial);
-  const { selectedDB, selectedTable } = state;
+  const { selectedDB, selectedTable, columns, selectedRowIndex, rows } = state;
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const { refresh, clearTable, runCustomQuery } = useBridgeSync(dispatch, selectedDB, selectedTable);
+  const { refresh, clearTable, runCustomQuery, saveRowToDB, deleteRowFromDB, reconnect } = useBridgeSync(dispatch, selectedDB, selectedTable);
 
   const selectDB = useCallback((db: string) => dispatch({ type: 'SELECT_DB', db }), []);
   const selectTable = useCallback((table: string) => dispatch({ type: 'SELECT_TABLE', table }), []);
   const selectRow = useCallback((index: number) => dispatch({ type: 'SELECT_ROW', index }), []);
   const closeRow = useCallback(() => dispatch({ type: 'CLOSE_ROW' }), []);
-  const saveRow = useCallback((updated: RowData) => dispatch({ type: 'SAVE_ROW', updated }), []);
-  const deleteRow = useCallback(() => dispatch({ type: 'DELETE_ROW' }), []);
 
-  return { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh, clearTable, runCustomQuery };
+  const saveRow = useCallback(
+    async (updated: RowData): Promise<MutationResult> => {
+      setMutating(true);
+      setMutationError(null);
+      const result = await saveRowToDB(updated, columns);
+      setMutating(false);
+      if (result.success) {
+        dispatch({ type: 'SAVE_ROW', updated });
+      } else {
+        setMutationError(result.error ?? 'Failed to save row');
+      }
+      return result;
+    },
+    [saveRowToDB, columns],
+  );
+
+  const deleteRow = useCallback(
+    async (): Promise<MutationResult> => {
+      if (selectedRowIndex === null) {
+        return { success: false, error: 'No row selected' };
+      }
+      const row = rows[selectedRowIndex];
+      if (!row) {
+        return { success: false, error: 'Row not found' };
+      }
+      setMutating(true);
+      setMutationError(null);
+      const result = await deleteRowFromDB(row, columns);
+      setMutating(false);
+      if (result.success) {
+        dispatch({ type: 'DELETE_ROW' });
+      } else {
+        setMutationError(result.error ?? 'Failed to delete row');
+      }
+      return result;
+    },
+    [deleteRowFromDB, columns, selectedRowIndex, rows],
+  );
+
+  const clearMutationError = useCallback(() => setMutationError(null), []);
+
+  return {
+    state,
+    selectDB,
+    selectTable,
+    selectRow,
+    closeRow,
+    saveRow,
+    deleteRow,
+    refresh,
+    clearTable,
+    runCustomQuery,
+    mutating,
+    mutationError,
+    clearMutationError,
+    reconnect,
+  };
 }
 

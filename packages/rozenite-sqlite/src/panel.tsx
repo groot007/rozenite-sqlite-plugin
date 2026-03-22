@@ -7,8 +7,8 @@ import { SqlPanel } from './components/SqlPanel';
 import { DataTable } from './components/DataTable';
 import { RowDetailPanel } from './components/RowDetailPanel';
 
-export default function SQLiteExplorerPanel() {
-  const { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh, clearTable, runCustomQuery } = useExplorerState();
+export default function SQLighterPanel() {
+  const { state, selectDB, selectTable, selectRow, closeRow, saveRow, deleteRow, refresh, clearTable, runCustomQuery, mutating, mutationError, clearMutationError, reconnect } = useExplorerState();
   const { databases, selectedDB, tables, selectedTable, rows, columns, selectedRowIndex, status, error } = state;
 
   const isLoadingTables = status === 'loadingTables';
@@ -48,6 +48,7 @@ export default function SQLiteExplorerPanel() {
           status={status}
           error={error}
           onClearTable={selectedTable ? clearTable : undefined}
+          onReconnect={reconnect}
         />
         {selectedRow !== null && (
           <RowDetailPanel
@@ -56,6 +57,9 @@ export default function SQLiteExplorerPanel() {
             onClose={closeRow}
             onSave={saveRow}
             onDelete={deleteRow}
+            mutating={mutating}
+            mutationError={mutationError}
+            onClearError={clearMutationError}
           />
         )}
       </View>

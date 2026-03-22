@@ -14,8 +14,18 @@ export interface RozeniteSQLiteConfig {
   sqlExecutor: SQLExecutor;
 }
 
+/** Escape a value for safe SQL string interpolation */
+function escapeValue(val: unknown): string {
+  if (val === null || val === undefined) return 'NULL';
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'boolean') return val ? '1' : '0';
+  // Escape single quotes by doubling them
+  const str = String(val).replace(/'/g, "''");
+  return `'${str}'`;
+}
+
 /**
- * Connects your React Native app to the Rozenite SQLite devtools panel.
+ * Connects your React Native app to the SQLighter devtools panel.
  *
  * Call this once somewhere near the root of your app (or in the component
  * that holds the database instances). It handles all devtools communication —
@@ -57,6 +67,55 @@ export function useRozeniteSQLite(config: RozeniteSQLiteConfig): void {
               error: error instanceof Error ? error.message : String(error),
             });
           },
+        );
+      }),
+
+      client.onMessage(EVENTS.SAVE_ROW, (payload: unknown) => {
+        const { dbName, table, row, primaryKey } = payload as {
+          dbName: string;
+          table: string;
+          row: Record<string, unknown>;
+          primaryKey: string;
+        };
+        const pkValue = row[primaryKey];
+        const columns = Object.keys(row).filter((k) => k !== primaryKey);
+        const setClause = columns.map((col) => `"${col}" = ${escapeValue(row[col])}`).join(', ');
+        const query = `UPDATE "${table}" SET ${setClause} WHERE "${primaryKey}" = ${escapeValue(pkValue)}`;
+        configRef.current.sqlExecutor(dbName, query).then(
+          () => client.send(EVENTS.MUTATION_RESULT, { success: true }),
+          (error: unknown) => client.send(EVENTS.MUTATION_RESULT, {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }),
+
+      client.onMessage(EVENTS.DELETE_ROW, (payload: unknown) => {
+        const { dbName, table, primaryKey, primaryKeyValue } = payload as {
+          dbName: string;
+          table: string;
+          primaryKey: string;
+          primaryKeyValue: unknown;
+        };
+        const query = `DELETE FROM "${table}" WHERE "${primaryKey}" = ${escapeValue(primaryKeyValue)}`;
+        configRef.current.sqlExecutor(dbName, query).then(
+          () => client.send(EVENTS.MUTATION_RESULT, { success: true }),
+          (error: unknown) => client.send(EVENTS.MUTATION_RESULT, {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }),
+
+      client.onMessage(EVENTS.CLEAR_TABLE, (payload: unknown) => {
+        const { dbName, table } = payload as { dbName: string; table: string };
+        const query = `DELETE FROM "${table}"`;
+        configRef.current.sqlExecutor(dbName, query).then(
+          () => client.send(EVENTS.MUTATION_RESULT, { success: true }),
+          (error: unknown) => client.send(EVENTS.MUTATION_RESULT, {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          }),
         );
       }),
     ];

@@ -1,4 +1,4 @@
-# rozenite-sqlite
+# SQLighter
 
 A [Rozenite](https://rozenite.dev) devtools plugin that adds a live SQLite explorer panel to your React Native app. Browse your databases, inspect tables, run arbitrary SQL queries, and view row details — all from the Rozenite devtools panel without leaving your development workflow.
 

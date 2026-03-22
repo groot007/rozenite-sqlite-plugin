@@ -6,10 +6,10 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { C, type RowData } from '../theme';
 import Pagination from './Pagination';
+import { Placeholder } from './Placeholder';
 import type { ExplorerStatus } from '../hooks/useExplorerState';
 
 export interface DataTableProps {
@@ -20,13 +20,14 @@ export interface DataTableProps {
   status: ExplorerStatus;
   error: string | null;
   onClearTable?: () => void;
+  onReconnect?: () => void;
 }
 
 const COL_WIDTH = 160;
 const IDX_WIDTH = 44;
 const HEADER_HEIGHT = 42;
 
-export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status, error, onClearTable }: DataTableProps) {
+export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status, error, onClearTable, onReconnect }: DataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [search, setSearch] = useState<Record<string, string>>({});
@@ -152,52 +153,56 @@ export function DataTable({ columns, rows, selectedRowIndex, onRowSelect, status
 
   if (status === 'connecting') {
     return (
-      <View style={s.placeholder}>
-        <Text style={s.placeholderEmoji}>📡</Text>
-        <Text style={s.placeholderTitle}>Waiting for app…</Text>
-        <Text style={s.placeholderSub}>
-          Make sure your app is running and useRozeniteSQLite is initialized
-        </Text>
-      </View>
+      <Placeholder
+        emoji="📡"
+        title="Waiting for app…"
+        subtitle="Make sure your app is running and useSQLighter is initialized"
+        buttonText={onReconnect ? "↻ Reconnect" : undefined}
+        onButtonPress={onReconnect}
+      />
     );
   }
 
   if (status === 'error') {
     return (
-      <View style={s.placeholder}>
-        <Text style={s.placeholderEmoji}>⚠️</Text>
-        <Text style={s.placeholderTitle}>Query failed</Text>
-        <Text style={s.placeholderSub}>{error}</Text>
-      </View>
+      <Placeholder
+        emoji="⚠️"
+        title="Query failed"
+        subtitle={error ?? undefined}
+        buttonText={onReconnect ? "↻ Try again" : undefined}
+        onButtonPress={onReconnect}
+      />
     );
   }
 
   if (status === 'loadingTables' || status === 'loadingData') {
     return (
-      <View style={s.placeholder}>
-        <ActivityIndicator size="large" color={C.accent} />
-        <Text style={s.placeholderText}>Loading…</Text>
-      </View>
+      <Placeholder
+        loading
+        title="Loading…"
+        buttonText={onReconnect ? "↻ Refresh" : undefined}
+        onButtonPress={onReconnect}
+      />
     );
   }
 
   if (columns.length === 0) {
     return (
-      <View style={s.placeholder}>
-        <Text style={s.placeholderEmoji}>🗄️</Text>
-        <Text style={s.placeholderTitle}>No data to display</Text>
-        <Text style={s.placeholderSub}>Select a database and table above</Text>
-      </View>
+      <Placeholder
+        emoji="🗄️"
+        title="No data to display"
+        subtitle="Select a database and table above"
+      />
     );
   }
 
   if (rows.length === 0) {
     return (
-      <View style={s.placeholder}>
-        <Text style={s.placeholderEmoji}>📭</Text>
-        <Text style={s.placeholderTitle}>Table is empty</Text>
-        <Text style={s.placeholderSub}>This table has no rows yet</Text>
-      </View>
+      <Placeholder
+        emoji="📭"
+        title="Table is empty"
+        subtitle="This table has no rows yet"
+      />
     );
   }
 
@@ -436,10 +441,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     zIndex: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
+    boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
   },
   filterInput: {
     flex: 1,
@@ -476,11 +478,6 @@ const s = StyleSheet.create({
   idxText: { fontSize: 11, color: C.textMuted, fontWeight: '600', textAlign: 'center' },
   noResults: { paddingVertical: 32, alignItems: 'center' },
   noResultsText: { fontSize: 13, color: C.textMuted, fontStyle: 'italic' },
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 60 },
-  placeholderEmoji: { fontSize: 36, marginBottom: 16 },
-  placeholderTitle: { fontSize: 15, fontWeight: '600', color: C.textSecondary, marginBottom: 6 },
-  placeholderSub: { fontSize: 13, color: C.textMuted },
-  placeholderText: { fontSize: 14, color: C.textSecondary, marginTop: 14 },
   resizeHandle: {
     position: 'absolute',
     right: 0,

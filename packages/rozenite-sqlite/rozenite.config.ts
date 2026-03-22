@@ -1,7 +1,7 @@
 export default {
   panels: [
     {
-      name: 'SQLite',
+      name: 'SQLighter',
       source: './src/panel.tsx',
     },
   ],

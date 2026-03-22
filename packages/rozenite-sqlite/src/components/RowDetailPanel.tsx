@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { C, type RowData } from '../theme';
+import type { MutationResult } from '../hooks/useBridgeSync';
 
 function isJsonString(val: string): boolean {
   const t = val.trim();
@@ -12,11 +13,14 @@ export interface RowDetailPanelProps {
   row: RowData | null;
   rowIndex: number | null;
   onClose: () => void;
-  onSave: (updated: RowData) => void;
-  onDelete: () => void;
+  onSave: (updated: RowData) => Promise<MutationResult>;
+  onDelete: () => Promise<MutationResult>;
+  mutating?: boolean;
+  mutationError?: string | null;
+  onClearError?: () => void;
 }
 
-export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: RowDetailPanelProps) {
+export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete, mutating, mutationError, onClearError }: RowDetailPanelProps) {
   const [draft, setDraft] = useState<RowData>({});
   const [dirty, setDirty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -45,9 +49,20 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
     setDirty(true);
   };
 
-  const handleSave = () => {
-    onSave(draft);
-    setDirty(false);
+  const handleSave = async () => {
+    onClearError?.();
+    const result = await onSave(draft);
+    if (result.success) {
+      setDirty(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    onClearError?.();
+    const result = await onDelete();
+    if (result.success) {
+      setConfirmDelete(false);
+    }
   };
 
   const handleCancel = () => {
@@ -100,25 +115,41 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
       </ScrollView>
 
       <View style={s.primaryActions}>
-        <Pressable
-          style={({ pressed }) => [s.btn, s.btnSave, !dirty && s.btnSaveDisabled, pressed && !dirty ? {} : pressed && s.btnPressed]}
-          onPress={dirty ? handleSave : undefined}
-        >
-          <Text style={[s.btnSaveText, !dirty && s.btnSaveTextDisabled]}>Save</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [s.btn, s.btnCancel, pressed && s.btnPressed]}
-          onPress={handleCancel}
-        >
-          <Text style={s.btnCancelText}>Cancel</Text>
-        </Pressable>
+        {mutationError && (
+          <View style={s.errorBox}>
+            <Text style={s.errorText}>{mutationError}</Text>
+            <Pressable onPress={onClearError} style={s.errorClose}>
+              <Text style={s.errorCloseText}>✕</Text>
+            </Pressable>
+          </View>
+        )}
+        <View style={s.primaryActionsRow}>
+          <Pressable
+            style={({ pressed }) => [s.btn, s.btnSave, (!dirty || mutating) && s.btnSaveDisabled, pressed && !dirty ? {} : pressed && s.btnPressed]}
+            onPress={dirty && !mutating ? handleSave : undefined}
+            disabled={!dirty || mutating}
+          >
+            {mutating ? (
+              <ActivityIndicator size="small" color={C.bg} />
+            ) : (
+              <Text style={[s.btnSaveText, !dirty && s.btnSaveTextDisabled]}>Save</Text>
+            )}
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [s.btn, s.btnCancel, pressed && s.btnPressed]}
+            onPress={handleCancel}
+          >
+            <Text style={s.btnCancelText}>Cancel</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={s.deleteZone}>
         {!confirmDelete ? (
           <Pressable
-            style={({ pressed }) => [s.btnDeleteSmall, pressed && s.btnPressed]}
-            onPress={() => setConfirmDelete(true)}
+            style={({ pressed }) => [s.btnDeleteSmall, mutating && s.btnSaveDisabled, pressed && s.btnPressed]}
+            onPress={() => !mutating && setConfirmDelete(true)}
+            disabled={mutating}
           >
             <Text style={s.btnDeleteSmallText}>⊘  Delete this row</Text>
           </Pressable>
@@ -127,10 +158,15 @@ export function RowDetailPanel({ row, rowIndex, onClose, onSave, onDelete }: Row
             <Text style={s.confirmLabel}>This action cannot be undone.</Text>
             <View style={s.confirmRow}>
               <Pressable
-                style={({ pressed }) => [s.btn, s.btnConfirm, { flex: 1 }, pressed && s.btnPressed]}
-                onPress={onDelete}
+                style={({ pressed }) => [s.btn, s.btnConfirm, { flex: 1 }, mutating && s.btnSaveDisabled, pressed && s.btnPressed]}
+                onPress={!mutating ? handleDelete : undefined}
+                disabled={mutating}
               >
-                <Text style={s.btnConfirmText}>Yes, delete</Text>
+                {mutating ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={s.btnConfirmText}>Yes, delete</Text>
+                )}
               </Pressable>
               <Pressable
                 style={({ pressed }) => [s.btn, s.btnCancelSmall, { flex: 1 }, pressed && s.btnPressed]}
@@ -153,11 +189,6 @@ const s = StyleSheet.create({
     borderLeftWidth: 1,
     borderLeftColor: C.border,
     flexDirection: 'column',
-    shadowColor: '#000',
-    shadowOffset: { width: -8, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 10,
     boxShadow: '-8px 0 24px rgba(0,0,0,0.45)',
   },
   header: {
@@ -228,13 +259,17 @@ const s = StyleSheet.create({
     paddingTop: 10,
   },
   primaryActions: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 10,
     borderTopWidth: 1,
     borderTopColor: C.border,
+  },
+  primaryActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   deleteZone: {
     paddingHorizontal: 16,
@@ -270,4 +305,20 @@ const s = StyleSheet.create({
   btnConfirm: { backgroundColor: C.danger },
   btnConfirmText: { fontSize: 12, fontWeight: '600', color: '#fff' },
   btnCancelSmall: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.3)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+    width: '100%',
+  },
+  errorText: { flex: 1, fontSize: 12, color: C.danger, fontWeight: '500' },
+  errorClose: { marginLeft: 8, padding: 4 },
+  errorCloseText: { fontSize: 12, color: C.danger },
 });

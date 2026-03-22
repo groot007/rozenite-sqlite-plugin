@@ -1,7 +1,7 @@
 {
   "name": "database-example-app",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "WITH_ROZENITE=true ROZENITE_DEV_MODE=rozenite-sqlite expo start --reset-cache",
     "reset-project": "node ./scripts/reset-project.js",

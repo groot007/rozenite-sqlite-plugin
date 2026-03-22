@@ -5,6 +5,10 @@ export const EVENTS = {
   SEND_DB_LIST: 'send-db-list',
   SQL_EXECUTE: 'sql-execute',
   SQL_EXEC_RESULT: 'sql-exec-result',
+  SAVE_ROW: 'save-row',
+  DELETE_ROW: 'delete-row',
+  CLEAR_TABLE: 'clear-table',
+  MUTATION_RESULT: 'mutation-result',
 } as const;
 
 export const QUERIES = {
